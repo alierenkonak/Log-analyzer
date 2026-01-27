@@ -5,29 +5,30 @@ import path from 'path';
 let db: Database.Database | null = null;
 
 export function getDb() {
-    if (db) return db;
+  if (db) return db;
 
-    // Development ortamında proje kökünde, prod'da userData klasöründe tut
-    const isDev = !app.isPackaged;
-    const dbPath = isDev
-        ? path.join(process.cwd(), 'logs.db')
-        : path.join(app.getPath('userData'), 'logs.db');
+  // Development ortamında proje kökünde, prod'da userData klasöründe tut
+  const isDev = !app.isPackaged;
+  const dbPath = isDev
+    ? path.join(process.cwd(), 'logs.db')
+    : path.join(app.getPath('userData'), 'logs.db');
 
-    db = new Database(dbPath, { verbose: console.log });
-    db.pragma('journal_mode = WAL'); // Performans için
+  db = new Database(dbPath, { verbose: console.log });
+  db.pragma('journal_mode = WAL'); // Performans için
 
-    initSchema();
-    return db;
+  initSchema();
+  return db;
 }
 
 function initSchema() {
-    if (!db) return;
+  if (!db) return;
 
-    const schema = `
+  const schema = `
     CREATE TABLE IF NOT EXISTS logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT,
+      time TEXT,
       measurement_id TEXT,
-      timestamp DATETIME,
       status TEXT,
       measurement_group TEXT,
       measurement_style TEXT,
@@ -51,9 +52,9 @@ function initSchema() {
 
     -- Hızlı sorgular için indeksler
     CREATE INDEX IF NOT EXISTS idx_logs_measurement_id ON logs(measurement_id);
-    CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_logs_date_time ON logs(date, time);
     CREATE INDEX IF NOT EXISTS idx_logs_status ON logs(status);
   `;
 
-    db.exec(schema);
+  db.exec(schema);
 }

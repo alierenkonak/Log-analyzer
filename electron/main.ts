@@ -1,12 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
-import { createRequire } from 'node:module'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { getDashboardStats, insertLogs, getLogs } from './database/service'
+import { parseLogFile } from './utils/logParser'
+import { getDb } from './database/init'
+
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const __filename = fileURLToPath(import.meta.url)
-
 
 // The built directory structure
 //
@@ -69,20 +70,47 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
   // Veritabanını başlat
-  import('./database/init').then(({ getDb }) => {
+  try {
     getDb();
     console.log('Database initialized');
-  }).catch(err => console.error('Failed to init DB:', err));
+  } catch (err) {
+    console.error('Failed to init DB:', err);
+  }
 
   // IPC Handlers
   ipcMain.handle('db:stats', () => {
-    return { total: 0, failedRate: 0 }; // Mock data
+    return Promise.resolve(getDashboardStats());
+  });
+
+  ipcMain.handle('db:logs', (_, page: number, pageSize: number) => {
+    return Promise.resolve(getLogs(page, pageSize));
   });
 
   ipcMain.handle('db:import', async (_, filePath) => {
-    console.log('Importing:', filePath);
-    // TODO: Implement actual import logic
-    return { success: true, count: 0 };
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const entries = parseLogFile(content);
+      const count = insertLogs(entries, path.basename(filePath));
+      return { success: true, count };
+    } catch (error) {
+      console.error('Import error:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Dialog handler for file selection
+  ipcMain.handle('dialog:openLog', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Log Files', extensions: ['log', 'Log', 'LOG'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths[0];
   });
 
   createWindow();
