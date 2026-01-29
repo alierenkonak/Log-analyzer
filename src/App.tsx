@@ -832,7 +832,7 @@ function App() {
                               {file.record_count.toLocaleString()} records • {formatDate(file.imported_at)}
                             </div>
                           </div>
-                          <div className="relative">
+                          <div className="relative file-menu-container">
                             <button
                               onClick={() => setFileMenuOpen(fileMenuOpen === file.file_source ? null : file.file_source)}
                               className="p-1 hover:bg-muted rounded"
