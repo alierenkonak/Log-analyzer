@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { LayoutDashboard, FileUp, Activity, CheckCircle, XCircle, Loader2, Table, FileText, Calendar, Database, RefreshCw, FolderPlus, Folder, MoreVertical, Edit2, Trash2, FolderOpen, Check } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { LogsTable } from './components/LogsTable'
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [stats, setStats] = useState({ total: 0, failedRate: 0 })
+  const [stats, setStats] = useState({ total: 0, failedRate: 0.0, avgMeasurementTime: 0, avgUncertainty: 0 })
+  const [trendData, setTrendData] = useState<{ date: string; success: number; failed: number }[]>([])
+  const [trendGroupBy, setTrendGroupBy] = useState<'day' | 'hour'>('day')
+  const [errorData, setErrorData] = useState<{ name: string; value: number }[]>([])
+  const [distData, setDistData] = useState<{ name: string; value: number }[]>([])
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: boolean; count: number; error?: string } | null>(null)
 
@@ -53,15 +60,30 @@ function App() {
 
       if (isDashboardActive && selectedFile) {
         const result = await window.api.db.getStats([selectedFile])
+        const trend = await window.api.db.getTrend([selectedFile], trendGroupBy)
+        const errors = await window.api.db.getErrors([selectedFile])
+        const dist = await window.api.db.getDistribution('measurement_group', [selectedFile])
+
         setStats(result)
+        setTrendData(trend)
+        setErrorData(errors)
+        setDistData(dist)
       } else {
-        // If no file selected or not enabled for dashboard, show zeros
-        setStats({ total: 0, failedRate: 0 })
+        const files = undefined; // Fetch globally if no specific dashboard file selected
+        const result = await window.api.db.getStats(files)
+        const trend = await window.api.db.getTrend(files, trendGroupBy)
+        const errors = await window.api.db.getErrors(files)
+        const dist = await window.api.db.getDistribution('measurement_group', files)
+
+        setStats(result)
+        setTrendData(trend)
+        setErrorData(errors)
+        setDistData(dist)
       }
     } catch (e) {
       console.error('Failed to fetch stats:', e)
     }
-  }, [selectedFile, fileScope])
+  }, [selectedFile, fileScope, trendGroupBy])
 
   // Get selected files for logs table
   const getLogsSelectedFile = (): string | null => {
@@ -226,17 +248,6 @@ function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('import')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${activeTab === 'import'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-              }`}
-          >
-            <FileUp className="w-5 h-5" />
-            Data Import
-          </button>
-
-          <button
             onClick={() => setActiveTab('logs')}
             className={`w-full flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${activeTab === 'logs'
               ? 'bg-primary text-primary-foreground'
@@ -245,6 +256,17 @@ function App() {
           >
             <Table className="w-5 h-5" />
             Logs Table
+          </button>
+
+          <button
+            onClick={() => setActiveTab('import')}
+            className={`w-full flex items-center gap-3 px-4 py-2 rounded-md transition-colors ${activeTab === 'import'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
+              }`}
+          >
+            <FileUp className="w-5 h-5" />
+            Data Import
           </button>
         </nav>
 
@@ -280,8 +302,6 @@ function App() {
 
           {/* File List */}
           <div className="space-y-1">
-
-
             {loadingFiles ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -340,14 +360,185 @@ function App() {
               )}
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="p-6 bg-card rounded-xl border shadow-sm">
-                <div className="text-sm font-medium text-muted-foreground">Total Tests</div>
-                <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
+              {/* Total Measurements */}
+              <div className="p-6 bg-card rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Total Measurements</div>
+                  <div className="text-3xl font-extrabold text-foreground">{stats.total.toLocaleString()}</div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Activity className="w-4 h-4 text-blue-500" />
+                  <span>Recorded logs</span>
+                </div>
               </div>
-              <div className="p-6 bg-card rounded-xl border shadow-sm">
-                <div className="text-sm font-medium text-muted-foreground">Failed Rate</div>
-                <div className="text-2xl font-bold text-destructive">{stats.failedRate}%</div>
+
+              {/* Success Rate */}
+              <div className="p-6 bg-card rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Success Rate</div>
+                  <div className="text-3xl font-extrabold text-foreground">{Math.max(0, 100 - stats.failedRate).toFixed(1)}%</div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-xs">
+                  <CheckCircle className={`w-4 h-4 ${100 - stats.failedRate > 90 ? 'text-green-500' : 'text-orange-500'}`} />
+                  <span className="text-muted-foreground">Passed tests</span>
+                </div>
               </div>
+
+              {/* Avg Measurement Time */}
+              <div className="p-6 bg-card rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Avg. Duration</div>
+                  <div className="text-3xl font-extrabold text-foreground">{stats.avgMeasurementTime} ms</div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Activity className="w-4 h-4 text-purple-500" />
+                  <span>Per measurement</span>
+                </div>
+              </div>
+
+              {/* Avg Uncertainty */}
+              <div className="p-6 bg-card rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Avg. Uncertainty</div>
+                  <div className="text-3xl font-extrabold text-foreground">{stats.avgUncertainty}</div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Activity className="w-4 h-4 text-orange-500" />
+                  <span>Quality variance</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid gap-6 md:grid-cols-2">
+
+              {/* Trend Chart (Full Width on mobile, spanning on large) */}
+              <div className="col-span-1 md:col-span-2 bg-card rounded-xl border shadow-sm p-6">
+                <div className="mb-4 flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Time Analysis (Trend)</h3>
+                    <p className="text-sm text-muted-foreground">Daily/Hourly success vs failure trends</p>
+                  </div>
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <button
+                      onClick={() => setTrendGroupBy('day')}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${trendGroupBy === 'day'
+                        ? 'bg-background shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                      Daily
+                    </button>
+                    <button
+                      onClick={() => setTrendGroupBy('hour')}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${trendGroupBy === 'hour'
+                        ? 'bg-background shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                      Hourly
+                    </button>
+                  </div>
+                </div>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" className="opacity-50" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="currentColor"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke="currentColor"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `${value}`}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px', color: '#000000' }}
+                        itemStyle={{ color: '#000000' }}
+                        cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+                      />
+                      <Legend iconType="circle" />
+                      <Bar dataKey="success" name="Success" stackId="a" fill="#22c55e" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="failed" name="Failed" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Distribution Chart */}
+              <div className="bg-card rounded-xl border shadow-sm p-6">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold">Measurement Groups</h3>
+                  <p className="text-sm text-muted-foreground">Distribution by group type</p>
+                </div>
+                <div className="h-[300px] w-full flex items-center justify-center">
+                  {distData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={distData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {distData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }} />
+                        <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="text-muted-foreground text-sm">No distribution data available</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Top Errors Chart */}
+              <div className="bg-card rounded-xl border shadow-sm p-6">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold">Top Failure Causes</h3>
+                  <p className="text-sm text-muted-foreground">Most frequent error descriptions</p>
+                </div>
+                <div className="h-[300px] w-full">
+                  {errorData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={errorData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" className="opacity-50" />
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={150}
+                          tick={{ fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }}
+                          cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+                        />
+                        <Bar dataKey="value" name="Error Count" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                      No errors recorded
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         )}

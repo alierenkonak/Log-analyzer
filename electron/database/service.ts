@@ -40,17 +40,27 @@ export function getDashboardStats(selectedFiles?: string[]) {
     params.push(...selectedFiles);
   }
 
-  const total = db.prepare(`SELECT COUNT(*) as count FROM logs ${whereClause}`).get(...params) as { count: number };
+  const stats = db.prepare(`
+    SELECT 
+      COUNT(*) as count,
+      AVG(measurement_time) as avgTime,
+      AVG(uncertainty) as avgUncertainty
+    FROM logs 
+    ${whereClause}
+  `).get(...params) as { count: number; avgTime: number | null; avgUncertainty: number | null };
+
   const failedQuery = selectedFiles && selectedFiles.length > 0
     ? `SELECT COUNT(*) as count FROM logs WHERE status LIKE 'Failed%' AND file_source IN (${selectedFiles.map(() => '?').join(', ')})`
     : "SELECT COUNT(*) as count FROM logs WHERE status LIKE 'Failed%'";
   const failed = db.prepare(failedQuery).get(...params) as { count: number };
 
-  const failedRate = total.count > 0 ? ((failed.count / total.count) * 100).toFixed(1) : 0;
+  const failedRate = stats.count > 0 ? ((failed.count / stats.count) * 100).toFixed(1) : 0;
 
   return {
-    total: total.count,
-    failedRate: Number(failedRate)
+    total: stats.count,
+    failedRate: Number(failedRate),
+    avgMeasurementTime: stats.avgTime ? Number(stats.avgTime.toFixed(2)) : 0,
+    avgUncertainty: stats.avgUncertainty ? Number(stats.avgUncertainty.toFixed(3)) : 0
   };
 }
 
@@ -332,4 +342,104 @@ export function getFilterOptions() {
     measurementStyles: measurementStyles.map(r => r.measurement_style),
     fileSources: fileSources.map(r => r.file_source)
   };
+}
+
+export interface TrendStat {
+  date: string;
+  success: number;
+  failed: number;
+}
+
+export function getTrendStats(selectedFiles?: string[], groupBy: 'day' | 'hour' = 'day'): TrendStat[] {
+  const db = getDb();
+  if (!db) return [];
+
+  let whereClause = '';
+  const params: string[] = [];
+
+  if (selectedFiles && selectedFiles.length > 0) {
+    const placeholders = selectedFiles.map(() => '?').join(', ');
+    whereClause = `WHERE file_source IN (${placeholders})`;
+    params.push(...selectedFiles);
+  }
+
+  const dateCol = groupBy === 'day' ? 'date' : "date || ' ' || substr(time, 1, 2) || ':00'";
+
+  const results = db.prepare(`
+    SELECT 
+      ${dateCol} as date,
+      SUM(CASE WHEN status LIKE 'Failed%' THEN 0 ELSE 1 END) as success,
+      SUM(CASE WHEN status LIKE 'Failed%' THEN 1 ELSE 0 END) as failed
+    FROM logs
+    ${whereClause}
+    GROUP BY ${dateCol}
+    ORDER BY date ASC
+  `).all(...params) as { date: string; success: number; failed: number }[];
+
+  return results;
+}
+
+export interface ErrorStat {
+  name: string;
+  value: number;
+}
+
+export function getErrorStats(selectedFiles?: string[]): ErrorStat[] {
+  const db = getDb();
+  if (!db) return [];
+
+  let whereClause = "WHERE error_desc IS NOT NULL AND error_desc != '' AND error_desc != '-'";
+  const params: string[] = [];
+
+  if (selectedFiles && selectedFiles.length > 0) {
+    const placeholders = selectedFiles.map(() => '?').join(', ');
+    whereClause += ` AND file_source IN (${placeholders})`;
+    params.push(...selectedFiles);
+  }
+
+  const results = db.prepare(`
+    SELECT 
+      error_desc as name,
+      COUNT(*) as value
+    FROM logs
+    ${whereClause}
+    GROUP BY error_desc
+    ORDER BY value DESC
+    LIMIT 5
+  `).all(...params) as ErrorStat[];
+
+  return results;
+}
+
+export interface DistStat {
+  name: string;
+  value: number;
+}
+
+export function getDistributionStats(field: 'measurement_group' | 'measurement_style', selectedFiles?: string[]): DistStat[] {
+  const db = getDb();
+  if (!db) return [];
+
+  const col = field === 'measurement_group' ? 'measurement_group' : 'measurement_style';
+
+  let whereClause = `WHERE ${col} IS NOT NULL AND ${col} != ''`;
+  const params: string[] = [];
+
+  if (selectedFiles && selectedFiles.length > 0) {
+    const placeholders = selectedFiles.map(() => '?').join(', ');
+    whereClause += ` AND file_source IN (${placeholders})`;
+    params.push(...selectedFiles);
+  }
+
+  const results = db.prepare(`
+    SELECT 
+      ${col} as name,
+      COUNT(*) as value
+    FROM logs
+    ${whereClause}
+    GROUP BY ${col}
+    ORDER BY value DESC
+  `).all(...params) as DistStat[];
+
+  return results;
 }

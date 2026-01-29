@@ -15,7 +15,10 @@ contextBridge.exposeInMainWorld('api', {
     deleteFolder: (id: number) => ipcRenderer.invoke('db:deleteFolder', id),
     assignFileToFolder: (fileSource: string, folderId: number | null) => ipcRenderer.invoke('db:assignFileToFolder', fileSource, folderId),
     deleteFile: (fileSource: string) => ipcRenderer.invoke('db:deleteFile', fileSource),
-    exportExcel: (filters?: Record<string, unknown>) => ipcRenderer.invoke('export:excel', filters)
+    exportExcel: (filters?: Record<string, unknown>) => ipcRenderer.invoke('export:excel', filters),
+    getTrend: (selectedFiles?: string[], groupBy: 'day' | 'hour' = 'day') => ipcRenderer.invoke('db:trend', selectedFiles, groupBy),
+    getErrors: (selectedFiles?: string[]) => ipcRenderer.invoke('db:errors', selectedFiles),
+    getDistribution: (field: string, selectedFiles?: string[]) => ipcRenderer.invoke('db:distribution', field, selectedFiles)
   },
   dialog: {
     selectLogFile: () => ipcRenderer.invoke('dialog:openLog')

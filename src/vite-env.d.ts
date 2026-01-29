@@ -69,7 +69,7 @@ type FileScope = 'dashboard' | 'logs' | 'both';
 interface Window {
     api: {
         db: {
-            getStats: (selectedFiles?: string[]) => Promise<{ total: number; failedRate: number }>;
+            getStats: (selectedFiles?: string[]) => Promise<{ total: number; failedRate: number; avgMeasurementTime: number; avgUncertainty: number }>;
             importLog: (filePath: string) => Promise<{ success: boolean; count: number; error?: string }>;
             getLogs: (page: number, pageSize: number, filters?: LogFilters) => Promise<LogsResponse>;
             getFilterOptions: () => Promise<FilterOptions>;
@@ -82,6 +82,10 @@ interface Window {
             assignFileToFolder: (fileSource: string, folderId: number | null) => Promise<boolean>;
             deleteFile: (fileSource: string) => Promise<boolean>;
             exportExcel: (filters?: LogFilters) => Promise<{ success: boolean; filePath?: string; count?: number; error?: string; cancelled?: boolean }>;
+            // Analytics
+            getTrend: (selectedFiles?: string[], groupBy?: 'day' | 'hour') => Promise<{ date: string; success: number; failed: number }[]>;
+            getErrors: (selectedFiles?: string[]) => Promise<{ name: string; value: number }[]>;
+            getDistribution: (field: 'measurement_group' | 'measurement_style', selectedFiles?: string[]) => Promise<{ name: string; value: number }[]>;
         };
         dialog: {
             selectLogFile: () => Promise<string | null>;

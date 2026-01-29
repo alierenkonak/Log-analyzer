@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
-import { getDashboardStats, insertLogs, getLogs, getFilterOptions, getImportedFiles, getFolders, createFolder, renameFolder, deleteFolder, assignFileToFolder, deleteFile, getExportLogs, LogFilters } from './database/service'
+import { getDashboardStats, insertLogs, getLogs, getFilterOptions, getImportedFiles, getFolders, createFolder, renameFolder, deleteFolder, assignFileToFolder, deleteFile, getExportLogs, getTrendStats, getErrorStats, getDistributionStats, LogFilters } from './database/service'
 import { parseLogFile } from './utils/logParser'
 import { getDb } from './database/init'
 
@@ -93,6 +93,18 @@ app.whenReady().then(() => {
 
   ipcMain.handle('db:importedFiles', () => {
     return Promise.resolve(getImportedFiles());
+  });
+
+  ipcMain.handle('db:trend', (_, selectedFiles?: string[], groupBy: 'day' | 'hour' = 'day') => {
+    return Promise.resolve(getTrendStats(selectedFiles, groupBy));
+  });
+
+  ipcMain.handle('db:errors', (_, selectedFiles?: string[]) => {
+    return Promise.resolve(getErrorStats(selectedFiles));
+  });
+
+  ipcMain.handle('db:distribution', (_, field: 'measurement_group' | 'measurement_style', selectedFiles?: string[]) => {
+    return Promise.resolve(getDistributionStats(field, selectedFiles));
   });
 
   // Folder operations

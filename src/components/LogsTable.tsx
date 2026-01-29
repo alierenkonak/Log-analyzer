@@ -202,6 +202,7 @@ export function LogsTable({ selectedFile }: LogsTableProps) {
     useEffect(() => {
         fetchFilterOptions()
         fetchLogs(1, filters)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedFile])
 
     const handleFilterChange = (key: keyof LogFilters, value: string) => {
