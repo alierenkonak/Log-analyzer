@@ -43,5 +43,29 @@
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "build": {
+    "appId": "com.loganalyzer.app",
+    "productName": "Log Analyzer",
+    "directories": {
+      "output": "dist-build"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dmg",
+      "artifactName": "${productName}-${version}-Mac.${ext}"
+    },
+    "win": {
+      "target": "nsis",
+      "artifactName": "${productName}-${version}-Windows.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
 }
