@@ -47,14 +47,30 @@ function initSchema() {
       features_ok TEXT,
       error_desc TEXT,
       file_source TEXT,
-      imported_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      imported_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      folder_id INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS folders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     -- Hızlı sorgular için indeksler
     CREATE INDEX IF NOT EXISTS idx_logs_measurement_id ON logs(measurement_id);
     CREATE INDEX IF NOT EXISTS idx_logs_date_time ON logs(date, time);
     CREATE INDEX IF NOT EXISTS idx_logs_status ON logs(status);
+    CREATE INDEX IF NOT EXISTS idx_logs_folder_id ON logs(folder_id);
+    CREATE INDEX IF NOT EXISTS idx_logs_file_source ON logs(file_source);
   `;
 
   db.exec(schema);
+
+  // Migration: Add folder_id column if it doesn't exist (for existing databases)
+  try {
+    db.exec('ALTER TABLE logs ADD COLUMN folder_id INTEGER');
+  } catch {
+    // Column already exists, ignore
+  }
 }

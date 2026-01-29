@@ -33,12 +33,54 @@ interface LogsResponse {
     totalPages: number;
 }
 
+interface LogFilters {
+    status?: 'all' | 'failed' | 'succeeded';
+    dateFrom?: string;
+    dateTo?: string;
+    errorSearch?: string;
+    measurementGroup?: string;
+    measurementStyle?: string;
+    fileSource?: string;
+    sortBy?: 'date' | 'time';
+    sortOrder?: 'asc' | 'desc';
+}
+
+interface FilterOptions {
+    measurementGroups: string[];
+    measurementStyles: string[];
+    fileSources: string[];
+}
+
+interface ImportedFile {
+    file_source: string;
+    imported_at: string;
+    record_count: number;
+    folder_id: number | null;
+}
+
+interface Folder {
+    id: number;
+    name: string;
+    created_at: string;
+}
+
+type FileScope = 'dashboard' | 'logs' | 'both';
+
 interface Window {
     api: {
         db: {
-            getStats: () => Promise<{ total: number; failedRate: number }>;
+            getStats: (selectedFiles?: string[]) => Promise<{ total: number; failedRate: number }>;
             importLog: (filePath: string) => Promise<{ success: boolean; count: number; error?: string }>;
-            getLogs: (page: number, pageSize: number) => Promise<LogsResponse>;
+            getLogs: (page: number, pageSize: number, filters?: LogFilters) => Promise<LogsResponse>;
+            getFilterOptions: () => Promise<FilterOptions>;
+            getImportedFiles: () => Promise<ImportedFile[]>;
+            // Folder operations
+            getFolders: () => Promise<Folder[]>;
+            createFolder: (name: string) => Promise<Folder>;
+            renameFolder: (id: number, name: string) => Promise<boolean>;
+            deleteFolder: (id: number) => Promise<boolean>;
+            assignFileToFolder: (fileSource: string, folderId: number | null) => Promise<boolean>;
+            deleteFile: (fileSource: string) => Promise<boolean>;
         };
         dialog: {
             selectLogFile: () => Promise<string | null>;

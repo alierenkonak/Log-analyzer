@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
-import { getDashboardStats, insertLogs, getLogs } from './database/service'
+import { getDashboardStats, insertLogs, getLogs, getFilterOptions, getImportedFiles, getFolders, createFolder, renameFolder, deleteFolder, assignFileToFolder, deleteFile, LogFilters } from './database/service'
 import { parseLogFile } from './utils/logParser'
 import { getDb } from './database/init'
 
@@ -78,12 +78,45 @@ app.whenReady().then(() => {
   }
 
   // IPC Handlers
-  ipcMain.handle('db:stats', () => {
-    return Promise.resolve(getDashboardStats());
+  ipcMain.handle('db:stats', (_, selectedFiles?: string[]) => {
+    return Promise.resolve(getDashboardStats(selectedFiles));
   });
 
-  ipcMain.handle('db:logs', (_, page: number, pageSize: number) => {
-    return Promise.resolve(getLogs(page, pageSize));
+  ipcMain.handle('db:logs', (_, page: number, pageSize: number, filters?: LogFilters) => {
+    return Promise.resolve(getLogs(page, pageSize, filters));
+  });
+
+  ipcMain.handle('db:filterOptions', () => {
+    return Promise.resolve(getFilterOptions());
+  });
+
+  ipcMain.handle('db:importedFiles', () => {
+    return Promise.resolve(getImportedFiles());
+  });
+
+  // Folder operations
+  ipcMain.handle('db:getFolders', () => {
+    return Promise.resolve(getFolders());
+  });
+
+  ipcMain.handle('db:createFolder', (_, name: string) => {
+    return Promise.resolve(createFolder(name));
+  });
+
+  ipcMain.handle('db:renameFolder', (_, id: number, name: string) => {
+    return Promise.resolve(renameFolder(id, name));
+  });
+
+  ipcMain.handle('db:deleteFolder', (_, id: number) => {
+    return Promise.resolve(deleteFolder(id));
+  });
+
+  ipcMain.handle('db:assignFileToFolder', (_, fileSource: string, folderId: number | null) => {
+    return Promise.resolve(assignFileToFolder(fileSource, folderId));
+  });
+
+  ipcMain.handle('db:deleteFile', (_, fileSource: string) => {
+    return Promise.resolve(deleteFile(fileSource));
   });
 
   ipcMain.handle('db:import', async (_, filePath) => {
