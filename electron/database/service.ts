@@ -254,12 +254,77 @@ export function getLogs(page: number = 1, pageSize: number = 50, filters?: LogFi
   };
 }
 
+export function getExportLogs(filters?: LogFilters): LogRecord[] {
+  const db = getDb();
+  if (!db) return [];
+
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  // Build WHERE conditions based on filters
+  if (filters?.status && filters.status !== 'all') {
+    if (filters.status === 'failed') {
+      conditions.push("status LIKE 'Failed%'");
+    } else if (filters.status === 'succeeded') {
+      conditions.push("status NOT LIKE 'Failed%'");
+    }
+  }
+
+  if (filters?.dateFrom) {
+    conditions.push("date >= ?");
+    params.push(filters.dateFrom);
+  }
+
+  if (filters?.dateTo) {
+    conditions.push("date <= ?");
+    params.push(filters.dateTo);
+  }
+
+  if (filters?.errorSearch) {
+    conditions.push("error_desc LIKE ?");
+    params.push(`%${filters.errorSearch}%`);
+  }
+
+  if (filters?.measurementGroup) {
+    conditions.push("measurement_group = ?");
+    params.push(filters.measurementGroup);
+  }
+
+  if (filters?.measurementStyle) {
+    conditions.push("measurement_style = ?");
+    params.push(filters.measurementStyle);
+  }
+
+  if (filters?.fileSource) {
+    conditions.push("file_source = ?");
+    params.push(filters.fileSource);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // Build ORDER BY clause
+  const sortColumn = filters?.sortBy || 'date';
+  const sortDirection = filters?.sortOrder || 'desc';
+  const orderByClause = sortColumn === 'date'
+    ? `ORDER BY date ${sortDirection.toUpperCase()}, time ${sortDirection.toUpperCase()}`
+    : `ORDER BY time ${sortDirection.toUpperCase()}, date ${sortDirection.toUpperCase()}`;
+
+  const logs = db.prepare(`
+    SELECT *
+    FROM logs 
+    ${whereClause}
+    ${orderByClause}
+  `).all(...params) as LogRecord[];
+
+  return logs;
+}
+
 export function getFilterOptions() {
   const db = getDb();
   if (!db) return { measurementGroups: [], measurementStyles: [], fileSources: [] };
 
-  const measurementGroups = db.prepare('SELECT DISTINCT measurement_group FROM logs WHERE measurement_group IS NOT NULL AND measurement_group != "" ORDER BY measurement_group').all() as { measurement_group: string }[];
-  const measurementStyles = db.prepare('SELECT DISTINCT measurement_style FROM logs WHERE measurement_style IS NOT NULL AND measurement_style != "" ORDER BY measurement_style').all() as { measurement_style: string }[];
+  const measurementGroups = db.prepare("SELECT DISTINCT measurement_group FROM logs WHERE measurement_group IS NOT NULL AND measurement_group != '' ORDER BY measurement_group").all() as { measurement_group: string }[];
+  const measurementStyles = db.prepare("SELECT DISTINCT measurement_style FROM logs WHERE measurement_style IS NOT NULL AND measurement_style != '' ORDER BY measurement_style").all() as { measurement_style: string }[];
   const fileSources = db.prepare('SELECT DISTINCT file_source FROM logs ORDER BY file_source').all() as { file_source: string }[];
 
   return {

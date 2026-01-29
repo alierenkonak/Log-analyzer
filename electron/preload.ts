@@ -14,7 +14,8 @@ contextBridge.exposeInMainWorld('api', {
     renameFolder: (id: number, name: string) => ipcRenderer.invoke('db:renameFolder', id, name),
     deleteFolder: (id: number) => ipcRenderer.invoke('db:deleteFolder', id),
     assignFileToFolder: (fileSource: string, folderId: number | null) => ipcRenderer.invoke('db:assignFileToFolder', fileSource, folderId),
-    deleteFile: (fileSource: string) => ipcRenderer.invoke('db:deleteFile', fileSource)
+    deleteFile: (fileSource: string) => ipcRenderer.invoke('db:deleteFile', fileSource),
+    exportExcel: (filters?: Record<string, unknown>) => ipcRenderer.invoke('export:excel', filters)
   },
   dialog: {
     selectLogFile: () => ipcRenderer.invoke('dialog:openLog')

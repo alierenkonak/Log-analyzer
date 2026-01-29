@@ -5,7 +5,7 @@ import {
     flexRender,
     createColumnHelper,
 } from '@tanstack/react-table'
-import { ChevronLeft, ChevronRight, Loader2, Filter, X, Search, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Filter, X, Search, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react'
 
 const columnHelper = createColumnHelper<LogRecord>()
 
@@ -138,6 +138,7 @@ export function LogsTable({ selectedFile }: LogsTableProps) {
     const [totalPages, setTotalPages] = useState(1)
     const [total, setTotal] = useState(0)
     const [showFilters, setShowFilters] = useState(true)
+    const [exporting, setExporting] = useState(false)
     const [filters, setFilters] = useState<LogFilters>(defaultFilters)
     const [filterOptions, setFilterOptions] = useState<FilterOptions>({
         measurementGroups: [],
@@ -240,6 +241,36 @@ export function LogsTable({ selectedFile }: LogsTableProps) {
         return filters.sortOrder === 'desc'
             ? <ArrowDown className="w-3 h-3 ml-1" />
             : <ArrowUp className="w-3 h-3 ml-1" />
+
+    }
+
+    const handleExport = async () => {
+        setExporting(true)
+        try {
+            // Use same clean filters logic as fetchLogs
+            const cleanFilters: LogFilters = {}
+            if (filters.status && filters.status !== 'all') cleanFilters.status = filters.status
+            if (filters.dateFrom) cleanFilters.dateFrom = filters.dateFrom
+            if (filters.dateTo) cleanFilters.dateTo = filters.dateTo
+            if (filters.errorSearch) cleanFilters.errorSearch = filters.errorSearch
+            if (filters.measurementGroup) cleanFilters.measurementGroup = filters.measurementGroup
+            if (filters.measurementStyle) cleanFilters.measurementStyle = filters.measurementStyle
+
+            if (selectedFile) {
+                cleanFilters.fileSource = selectedFile
+            } else if (filters.fileSource) {
+                cleanFilters.fileSource = filters.fileSource
+            }
+
+            cleanFilters.sortBy = filters.sortBy || 'date'
+            cleanFilters.sortOrder = filters.sortOrder || 'desc'
+
+            await window.api.db.exportExcel(cleanFilters)
+        } catch (error) {
+            console.error('Export failed:', error)
+        } finally {
+            setExporting(false)
+        }
     }
 
     const table = useReactTable({
@@ -428,6 +459,15 @@ export function LogsTable({ selectedFile }: LogsTableProps) {
                         >
                             <RotateCcw className="w-4 h-4" />
                             Reset
+                        </button>
+
+                        <button
+                            onClick={handleExport}
+                            disabled={exporting || loading}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center gap-2 hover:bg-green-700 transition-colors ml-auto disabled:opacity-50"
+                        >
+                            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            Export to Excel
                         </button>
 
                         {activeFilterCount > 0 && (

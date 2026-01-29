@@ -1,11 +1,12 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
-import { getDashboardStats, insertLogs, getLogs, getFilterOptions, getImportedFiles, getFolders, createFolder, renameFolder, deleteFolder, assignFileToFolder, deleteFile, LogFilters } from './database/service'
+import { getDashboardStats, insertLogs, getLogs, getFilterOptions, getImportedFiles, getFolders, createFolder, renameFolder, deleteFolder, assignFileToFolder, deleteFile, getExportLogs, LogFilters } from './database/service'
 import { parseLogFile } from './utils/logParser'
 import { getDb } from './database/init'
 
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
+import ExcelJS from 'exceljs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -144,6 +145,68 @@ app.whenReady().then(() => {
       return null;
     }
     return result.filePaths[0];
+  });
+
+  // Excel Export Handler
+  ipcMain.handle('export:excel', async (_, filters: LogFilters) => {
+    try {
+      const logs = getExportLogs(filters);
+
+      if (logs.length === 0) {
+        return { success: false, error: 'No logs found to export with current filters.' };
+      }
+
+      const { filePath } = await dialog.showSaveDialog({
+        title: 'Export Logs to Excel',
+        defaultPath: `logs_export_${new Date().toISOString().split('T')[0]}.xlsx`,
+        filters: [{ name: 'Excel File', extensions: ['xlsx'] }]
+      });
+
+      if (!filePath) {
+        return { success: false, cancelled: true };
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Logs');
+
+      worksheet.columns = [
+        { header: 'Date', key: 'date', width: 12 },
+        { header: 'Time', key: 'time', width: 12 },
+        { header: 'Measurement ID', key: 'measurement_id', width: 25 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Group', key: 'measurement_group', width: 15 },
+        { header: 'Style', key: 'measurement_style', width: 15 },
+        { header: 'Color Model', key: 'color_model', width: 15 },
+        { header: 'ID1', key: 'id1', width: 10 },
+        { header: 'ID2', key: 'id2', width: 10 },
+        { header: 'ID3', key: 'id3', width: 10 },
+        { header: 'X', key: 'x', width: 10 },
+        { header: 'Y', key: 'y', width: 10 },
+        { header: 'Z', key: 'z', width: 10 },
+        { header: 'RX', key: 'rx', width: 10 },
+        { header: 'RY', key: 'ry', width: 10 },
+        { header: 'RZ', key: 'rz', width: 10 },
+        { header: 'Uncertainty', key: 'uncertainty', width: 12 },
+        { header: 'Msmt Time', key: 'measurement_time', width: 12 },
+        { header: 'Features OK', key: 'features_ok', width: 12 },
+        { header: 'Error Description', key: 'error_desc', width: 40 },
+        { header: 'Source File', key: 'file_source', width: 30 }
+      ];
+
+      // Add rows
+      worksheet.addRows(logs);
+
+      // Style header
+      worksheet.getRow(1).font = { bold: true };
+
+      await workbook.xlsx.writeFile(filePath);
+
+      return { success: true, filePath, count: logs.length };
+
+    } catch (error) {
+      console.error('Export excel error:', error);
+      return { success: false, error: String(error) };
+    }
   });
 
   createWindow();

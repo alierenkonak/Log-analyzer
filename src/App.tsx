@@ -19,7 +19,7 @@ function App() {
   const [newFolderName, setNewFolderName] = useState('')
   const [editingFolder, setEditingFolder] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null)
+  const [expandedFolderIds, setExpandedFolderIds] = useState<number[]>([])
   const [folderMenuOpen, setFolderMenuOpen] = useState<number | null>(null)
   const [fileMenuOpen, setFileMenuOpen] = useState<string | null>(null)
 
@@ -153,7 +153,7 @@ function App() {
   const handleDeleteFolder = async (id: number) => {
     try {
       await window.api.db.deleteFolder(id)
-      if (selectedFolderId === id) setSelectedFolderId(null)
+      setExpandedFolderIds(prev => prev.filter(folderId => folderId !== id))
       await fetchFolders()
       await fetchImportedFiles()
     } catch (e) {
@@ -442,7 +442,7 @@ function App() {
                     folders.map((folder) => (
                       <div
                         key={folder.id}
-                        className={`p-3 rounded-lg border transition-colors ${selectedFolderId === folder.id ? 'bg-background border-primary shadow-sm' : 'hover:bg-muted'
+                        className={`p-3 rounded-lg border transition-colors ${expandedFolderIds.includes(folder.id) ? 'bg-background border-primary shadow-sm' : 'hover:bg-muted'
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -462,7 +462,11 @@ function App() {
                           ) : (
                             <div
                               className="flex items-center gap-2 flex-1 cursor-pointer"
-                              onClick={() => setSelectedFolderId(selectedFolderId === folder.id ? null : folder.id)}
+                              onClick={() => setExpandedFolderIds(prev =>
+                                prev.includes(folder.id)
+                                  ? prev.filter(id => id !== folder.id)
+                                  : [...prev, folder.id]
+                              )}
                             >
                               <Folder className="w-4 h-4 text-primary" />
                               <span className="font-medium">{folder.name}</span>
@@ -507,7 +511,7 @@ function App() {
                         </div>
 
                         {/* Files in Folder */}
-                        {selectedFolderId === folder.id && (
+                        {expandedFolderIds.includes(folder.id) && (
                           <div className="mt-3 pl-6 space-y-1">
                             {getFilesInFolder(folder.id).map((file) => (
                               <div key={file.file_source} className="group flex items-center justify-between p-2 bg-background rounded-md text-sm border border-border/50 shadow-sm">

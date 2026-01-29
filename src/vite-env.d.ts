@@ -81,6 +81,7 @@ interface Window {
             deleteFolder: (id: number) => Promise<boolean>;
             assignFileToFolder: (fileSource: string, folderId: number | null) => Promise<boolean>;
             deleteFile: (fileSource: string) => Promise<boolean>;
+            exportExcel: (filters?: LogFilters) => Promise<{ success: boolean; filePath?: string; count?: number; error?: string; cancelled?: boolean }>;
         };
         dialog: {
             selectLogFile: () => Promise<string | null>;
