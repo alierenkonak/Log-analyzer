@@ -69,16 +69,11 @@ function App() {
         setErrorData(errors)
         setDistData(dist)
       } else {
-        const files = undefined; // Fetch globally if no specific dashboard file selected
-        const result = await window.api.db.getStats(files)
-        const trend = await window.api.db.getTrend(files, trendGroupBy)
-        const errors = await window.api.db.getErrors(files)
-        const dist = await window.api.db.getDistribution('measurement_group', files)
-
-        setStats(result)
-        setTrendData(trend)
-        setErrorData(errors)
-        setDistData(dist)
+        // Clear stats if no specific file is selected for dashboard
+        setStats({ total: 0, failedRate: 0.0, avgMeasurementTime: 0, avgUncertainty: 0 })
+        setTrendData([])
+        setErrorData([])
+        setDistData([])
       }
     } catch (e) {
       console.error('Failed to fetch stats:', e)
@@ -353,10 +348,16 @@ function App() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-              {selectedFile && (fileScope === 'dashboard' || fileScope === 'both') && (
-                <span className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded-full">
-                  Filtering: {selectedFile}
+              {selectedFile && (fileScope === 'dashboard' || fileScope === 'both') ? (
+                <span className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded-full border border-border/50">
+                  Filtering: <span className="font-medium text-foreground">{selectedFile}</span>
                 </span>
+              ) : (
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-medium text-muted-foreground px-3 py-1 rounded-full border border-border/50 bg-muted/50">
+                    No declaration selected
+                  </span>
+                </div>
               )}
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
